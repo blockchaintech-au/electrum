@@ -160,19 +160,17 @@ class Synchronizer(PrintError):
         self.requested_addrs.remove(addr)
 
     @aiosafe
-    async def send_subscriptions(self):
-        async with TaskGroup() as group:
-            while True:
-                addr = await self.add_queue.get()
-                await group.spawn(self.subscribe_to_address(addr))
+    async def send_subscriptions(self, interface):
+        while True:
+            addr = await self.add_queue.get()
+            await interface.group.spawn(self.subscribe_to_address(addr))
 
     @aiosafe
-    async def handle_status(self):
-        async with TaskGroup() as group:
-            while True:
-                h, status = await self.status_queue.get()
-                addr = self.scripthash_to_address[h]
-                await group.spawn(self.on_address_status(addr, status))
+    async def handle_status(self, interface):
+        while True:
+            h, status = await self.status_queue.get()
+            addr = self.scripthash_to_address[h]
+            await interface.group.spawn(self.on_address_status(addr, status))
 
     @property
     def session(self):

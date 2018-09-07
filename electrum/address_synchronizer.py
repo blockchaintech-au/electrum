@@ -146,8 +146,10 @@ class AddressSynchronizer(PrintError):
             return
         # FIXME there are races here.. network.interface can become None
         self.network.futures.append(asyncio.get_event_loop().create_task(self.verifier.main()))
-        self.network.futures.append(asyncio.get_event_loop().create_task(self.synchronizer.send_subscriptions()))
-        self.network.futures.append(asyncio.get_event_loop().create_task(self.synchronizer.handle_status()))
+
+        self.network.futures.append(asyncio.get_event_loop().create_task(self.synchronizer.send_subscriptions(self.network.interface)))
+        self.network.futures.append(asyncio.get_event_loop().create_task(self.synchronizer.handle_status(self.network.interface)))
+        
         self.network.futures.append(asyncio.get_event_loop().create_task(self.synchronizer.main()))
 
     def start_threads(self, network):

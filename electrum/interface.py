@@ -32,7 +32,7 @@ import traceback
 import aiorpcx
 import asyncio
 import concurrent.futures
-from aiorpcx import ClientSession, Notification
+from aiorpcx import ClientSession, Notification, TaskGroup
 
 import requests
 
@@ -87,6 +87,7 @@ class Interface(PrintError):
         self.tip = 0
         self.blockchain = None
         self.network = network
+        self.group = TaskGroup()
         if proxy:
             username, pw = proxy.get('user'), proxy.get('password')
             if not username or not pw:
@@ -231,15 +232,16 @@ class Interface(PrintError):
             self.tip = subscription_res['height']
             self.mark_ready()
             copy_header_queue = asyncio.Queue()
-            block_retriever = asyncio.get_event_loop().create_task(self.run_fetch_blocks(subscription_res, copy_header_queue))
-            while True:
-                try:
-                    new_header = await asyncio.wait_for(header_queue.get(), 300)
-                    self.tip_header = new_header
-                    self.tip = new_header['block_height']
-                    await copy_header_queue.put(new_header)
-                except concurrent.futures.TimeoutError:
-                    await asyncio.wait_for(session.send_request('server.ping'), 5)
+            async with self.group as group:
+                await group.spawn(self.run_fetch_blocks(subscription_res, copy_header_queue))
+                while True:
+                    try:
+                        new_header = await asyncio.wait_for(header_queue.get(), 300)
+                        self.tip_header = new_header
+                        self.tip = new_header['block_height']
+                        await copy_header_queue.put(new_header)
+                    except concurrent.futures.TimeoutError:
+                        await asyncio.wait_for(session.send_request('server.ping'), 5)
 
     def close(self):
         self.fut.cancel()
